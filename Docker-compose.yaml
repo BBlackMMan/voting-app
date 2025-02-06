@@ -1,0 +1,83 @@
+services:
+  redis:
+    image: redis:latest
+    container_name: redis-container
+    ports:
+      - "6379:6379"
+    networks:
+      - voting_network
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres-container
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - voting_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+
+
+
+  vote:
+    build: ./vote
+    container_name: vote-container
+    depends_on:
+      - redis
+    ports:
+      - "5000:5000"
+    networks:
+      - voting_network
+
+  worker:
+    build: ./worker
+    container_name: worker-container
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      POSTGRES_HOST: postgres-container
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      REDIS_HOST: redis-container
+    networks:
+      - voting_network
+
+
+  result:
+    build: ./result
+    container_name: result-container
+    depends_on:
+      worker:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres-container
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "8888:8888"
+    networks:
+      - voting_network
+
+
+networks:
+  voting_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
