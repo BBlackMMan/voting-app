@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 8888
 
 # Lancer l'application
-CMD ["npm", "start"],
+CMD ["npm", "start"]
