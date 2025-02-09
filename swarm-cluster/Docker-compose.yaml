@@ -1,0 +1,103 @@
+services:
+  redis:
+    image: redis:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == worker]
+    ports:
+      - "6379:6379"
+    networks:
+      - voting_network
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager] 
+    ports:
+      - "5432:5432"
+    networks:
+      - voting_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres || exit 1"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+
+  vote:
+    image: blackmann/voting-app_images:vote  
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints: [node.role == worker]
+        preferences:
+          - spread: node.id
+    ports:
+      - "8080:8080"
+    networks:
+      - voting_network
+
+  worker:
+    image: blackmann/voting-app_images:worker
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      REDIS_HOST: redis
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints: [node.role == worker]
+    networks:
+      - voting_network
+
+  result:
+    image: blackmann/voting-app_images:result
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints: [node.role == worker]
+    ports:
+      - "8888:8888"
+    networks:
+      - voting_network
+
+networks:
+  voting_network:
+    driver: overlay 
+
+volumes:
+  postgres_data:
