@@ -93,7 +93,7 @@ services:
     ports:
       - "8888:8888"
     networks:
-      - voting_network,
+      - voting_network
 
 networks:
   voting_network:
